@@ -4,14 +4,14 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    private CameraController _cameraController;
+    private CamComponent _cameraController;
     private CharacterController _characterController;
 
     public bool MovementLock;
 
     private void Awake ( )
     {
-        _cameraController = transform.GetComponentInChildren<CameraController> ( );
+        _cameraController = transform.GetComponentInChildren<CamComponent> ( );
         _characterController = transform.GetComponentInChildren<CharacterController> ( );
     }
 

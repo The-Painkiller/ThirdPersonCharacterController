@@ -1,11 +1,10 @@
 ﻿using UnityEngine;
-using UnityEngine. InputSystem;
 
 [RequireComponent(typeof(Rigidbody))]
 public class CharacterController : MonoBehaviour
 {
     [SerializeField]
-    private CameraController _cameraController;
+    private CamComponent _cameraController;
     [SerializeField]
     private float _walkSpeed;
     [SerializeField]
@@ -40,28 +39,38 @@ public class CharacterController : MonoBehaviour
 
     private bool _hasJumped = false;
     private bool _isInAir = false;
-    private bool _isRunning = true;
+    private bool _isRunning = false;
     private bool _isCrouching = false;
-    private bool _isFighting = false;
+    public bool _isFighting = false;
     public bool IsMoving { get; private set; } = false;
 
     private CharacterAnimatorController _animatorController;
 
-    private void Awake ( )
+    private InputControls _inputControls;
+
+    private void Awake()
     {
-        _playerRigidBody = GetComponent<Rigidbody> ( );
-        _playerCollider = GetComponent<Collider> ( );
-        _animatorController = GetComponentInChildren<CharacterAnimatorController> ( );
+        _playerRigidBody = GetComponent<Rigidbody>();
+        _playerCollider = GetComponent<Collider>();
+        _animatorController = GetComponentInChildren<CharacterAnimatorController>();
 
-        _characterControlActions = new CharacterControlActions ( );
+        _characterControlActions = new CharacterControlActions();
+        _inputControls = new InputControls();
 
-        _characterControlActions.PlayerControls.Movement.performed += ( moveVector ) =>
+        _inputControls.InputActions.Movement.performed += (moveVector) =>
+        {
+            Vector2 movementVector = moveVector.ReadValue<Vector2>();
+        };
+
+        _inputControls.InputActions.Movement.started += Movement_started;
+
+        _characterControlActions.PlayerControls.Movement.performed += (moveVector) =>
         {
             _movementDirection = moveVector.ReadValue<Vector2>();
 
-            if ( _movementDirection != Vector2.zero )
+            if (_movementDirection != Vector2.zero)
             {
-                if ( !_isCrouching )
+                if (!_isCrouching)
                     _requiredSpeed = _isRunning ? _runSpeed : _walkSpeed;
                 else
                     _requiredSpeed = _crouchSpeed;
@@ -74,167 +83,187 @@ public class CharacterController : MonoBehaviour
                 IsMoving = false;
             }
 
-            UpdateCharacterMovement ( );
+            UpdateCharacterMovement();
 
         };
 
-        _characterControlActions.PlayerControls.LookDirection.performed += ( lookVector ) =>
+        _characterControlActions.PlayerControls.LookDirection.performed += (lookVector) =>
         {
-            _lookDirection = lookVector.ReadValue<Vector2> ( );
+            _lookDirection = lookVector.ReadValue<Vector2>();
         };
 
-        _characterControlActions.PlayerControls.Jump.performed += (jump ) => 
+        _characterControlActions.PlayerControls.Jump.performed += (jump) =>
         {
-            if ( _isInAir )
+            if (_isInAir)
                 return;
 
-            _playerRigidBody.AddForce ( Vector3.up * _jumpForce, ForceMode.Impulse );            
+            _playerRigidBody.AddForce(Vector3.up * _jumpForce, ForceMode.Impulse);
             _isInAir = false;
             _hasJumped = true;
-            PlayJumpAnimation ( );
+            PlayJumpAnimation();
         };
 
-        _characterControlActions.PlayerControls.RunToggle.started += ( runToggle ) =>
+        _characterControlActions.PlayerControls.RunToggle.started += (runToggle) =>
         {
-            _isRunning = false;
-            _requiredSpeed = _walkSpeed;
-        };
+            if (!IsMoving)
+                return;
 
-        _characterControlActions.PlayerControls.RunToggle.canceled += ( runToggle ) => 
-        {
             _isRunning = true;
             _requiredSpeed = _runSpeed;
         };
 
-        _characterControlActions.PlayerControls.CrouchToggle.started += ( crouchTOggle ) =>
+        _characterControlActions.PlayerControls.RunToggle.canceled += (runToggle) =>
+        {
+            if (!IsMoving)
+                return;
+
+            _isRunning = false;
+            _requiredSpeed = IsMoving ? _walkSpeed : 0;
+        };
+
+        _characterControlActions.PlayerControls.CrouchToggle.started += (crouchTOggle) =>
         {
             _isCrouching = true;
-            _requiredSpeed = IsMoving? _crouchSpeed : 0;
-            _animatorController.SetParameter ( "Crouching", _isCrouching );
+            _requiredSpeed = IsMoving ? _crouchSpeed : 0;
+            _animatorController.SetParameter("Crouching", _isCrouching);
         };
 
-        _characterControlActions.PlayerControls.CrouchToggle.canceled += ( crouchTOggle ) =>
+        _characterControlActions.PlayerControls.CrouchToggle.canceled += (crouchTOggle) =>
         {
             _isCrouching = false;
-            _requiredSpeed = IsMoving? _runSpeed : 0;
-            _animatorController.SetParameter ( "Crouching", _isCrouching );
+            _requiredSpeed = IsMoving ? _runSpeed : 0;
+            _animatorController.SetParameter("Crouching", _isCrouching);
         };
 
-        _characterControlActions.PlayerControls.AttackToggle.started += ( attack ) =>
+        _characterControlActions.PlayerControls.AttackToggle.started += (attack) =>
         {
-            _animatorController.SetParameter ( "Attacking", true );
-            int rand = Random.Range ( 1, 3 );
-            _animatorController.SetParameter ( "AttackMove", rand );
+            _animatorController.SetParameter("Attacking", true);
+            int rand = Random.Range(1, 3);
+            _animatorController.SetParameter("AttackMove", rand);
         };
 
-        _characterControlActions.PlayerControls.Defend.started += ( defend ) =>
+        _characterControlActions.PlayerControls.Defend.started += (defend) =>
         {
-            _animatorController.SetParameter ( "Defending", true );
+            _animatorController.SetParameter("Defending", true);
         };
 
-        _characterControlActions.PlayerControls.Defend.canceled += ( defend ) =>
+        _characterControlActions.PlayerControls.Defend.canceled += (defend) =>
         {
-            _animatorController.SetParameter ( "Defending", false );
+            _animatorController.SetParameter("Defending", false);
         };
     }
 
-    private void UpdateCharacterMovement ( )
+    private void Movement_started(UnityEngine.InputSystem.InputAction.CallbackContext obj)
     {
-        if ( !IsMoving )
+        Debug.Log("Move move move");
+    }
+
+    private void UpdateCharacterMovement()
+    {
+        if (!IsMoving)
             return;
 
-        if ( _movementDirection.x != 0 )
+        if (_movementDirection.x != 0 && !_isFighting)
         {
-            _characterOrientation = _cameraController.transform.right * Mathf.Sign ( _movementDirection.x );
+            _characterOrientation = _cameraController.transform.right * Mathf.Sign(_movementDirection.x);
         }
 
-        if ( _movementDirection.y != 0 )
+        if (_movementDirection.y != 0)
         {
-            _characterOrientation = _cameraController.transform.forward * Mathf.Sign ( _movementDirection.y );
+            if (_isFighting)
+                _characterOrientation = _cameraController.transform.forward;
+            else
+                _characterOrientation = _cameraController.transform.forward * Mathf.Sign(_movementDirection.y);
         }
 
         _characterBodyTransform.transform.forward = _characterOrientation;
     }
 
 
-    private void OnEnable ( )
+    private void OnEnable()
     {
-        _characterControlActions.Enable ( );
+        _characterControlActions.Enable();
     }
 
-    private void OnDisable ( )
+    private void OnDisable()
     {
-        _characterControlActions.Disable ( );
+        _characterControlActions.Disable();
     }
 
-    private void Start ( )
+    private void Start()
     {
         _playerTransform = this.transform;
-        _cameraController.AssignPlayerController ( this );
-        _cameraController.AssignTargetToFollow ( _animatorController.transform );
+        _cameraController.AssignPlayerController(this);
+        _cameraController.AssignTargetToFollow(_animatorController.transform);
     }
 
-    private void FixedUpdate ( )
+    private void FixedUpdate()
     {
-        TransitionMovementSpeed ( );
+        TransitionMovementSpeed();
 
-        if ( IsMoving )
+        if (IsMoving)
         {
-            _playerTransform.Rotate( 0, _lookDirection.x * _mouseSensitivity, 0 );
-            _cameraController.SetCamerOrientation ( _lookDirection.x * _mouseSensitivity, _lookDirection.y * _mouseSensitivity );
+            _playerTransform.Rotate(0, _lookDirection.x * _mouseSensitivity, 0);
+            _cameraController.SetCamerOrientation(_lookDirection.x * _mouseSensitivity, _lookDirection.y * _mouseSensitivity);
         }
         else
         {
-            _cameraController.SetCamerOrientation ( _lookDirection.x * _mouseSensitivity, _lookDirection.y * _mouseSensitivity );
+            _cameraController.SetCamerOrientation(_lookDirection.x * _mouseSensitivity, _lookDirection.y * _mouseSensitivity);
         }
 
         _playerTransform.position += _cameraController.transform.right * _movementDirection.x * Time.fixedDeltaTime * _moveSpeed + _cameraController.transform.forward * _movementDirection.y * Time.fixedDeltaTime * _moveSpeed;
 
-       _animatorController.SetParameter ( "BlendHorizontal",_movementDirection.x + _moveSpeed );
-       _animatorController.SetParameter ( "BlendVertical", _movementDirection.y + _moveSpeed );
-       _animatorController.SetParameter ( "MoveSpeed", _moveSpeed );
+        float moveX = _isFighting ? (Mathf.Abs(_movementDirection.x) + _moveSpeed) * Mathf.Sign(_movementDirection.x) : 0f;
 
-        if ( Mathf.Abs( _playerRigidBody.velocity.y) >= 0.5f )
+        float moveY = _isFighting ? (Mathf.Abs(_movementDirection.y) + _moveSpeed) * Mathf.Sign(_movementDirection.y) : (Mathf.Abs(_movementDirection.y) + _moveSpeed);
+
+
+        _animatorController.SetParameter("BlendHorizontal", moveX);
+
+        _animatorController.SetParameter("BlendVertical", moveY);
+        _animatorController.SetParameter("MoveSpeed", _moveSpeed);
+
+        if (Mathf.Abs(_playerRigidBody.velocity.y) >= 0.5f)
         {
             _isInAir = true;
         }
 
-        if ( _isInAir )
+        if (_isInAir)
         {
-            if ( Mathf.Approximately(_playerRigidBody.velocity.y,  0f ))
+            if (Mathf.Approximately(_playerRigidBody.velocity.y, 0f))
             {
                 _isInAir = false;
 
-                if ( _hasJumped )
+                if (_hasJumped)
                 {
                     _hasJumped = false;
                 }
-                PlayLandAnimation ( );
+                PlayLandAnimation();
             }
         }
     }
 
-    private void PlayJumpAnimation ( )
+    private void PlayJumpAnimation()
     {
-        _animatorController.SetParameter ( "Jumping" );
+        _animatorController.SetParameter("Jumping");
     }
 
-    private void PlayLandAnimation ( )
+    private void PlayLandAnimation()
     {
-        _animatorController.SetParameter ( "Landing" );
+        _animatorController.SetParameter("Landing");
     }
 
-    private void TransitionMovementSpeed ( )
+    private void TransitionMovementSpeed()
     {
-        if ( Mathf.Approximately(_moveSpeed, _requiredSpeed ))
+        if (Mathf.Approximately(_moveSpeed, _requiredSpeed))
         {
-            if ( _lerpTime != 0 )
+            if (_lerpTime != 0)
                 _lerpTime = 0;
 
             return;
         }
 
         _lerpTime += _lerpMultiplier;
-        _moveSpeed = Mathf.Lerp ( _moveSpeed, _requiredSpeed, _lerpTime );
+        _moveSpeed = Mathf.Lerp(_moveSpeed, _requiredSpeed, _lerpTime);
     }
 }

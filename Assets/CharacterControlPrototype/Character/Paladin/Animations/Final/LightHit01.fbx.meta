@@ -38,7 +38,7 @@ ModelImporter:
       name: LightHit01
       takeName: mixamo.com
       internalID: 0
-      firstFrame: 0
+      firstFrame: 0.2
       lastFrame: 45
       wrapMode: 0
       orientationOffsetY: 0
@@ -59,7 +59,7 @@ ModelImporter:
       bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000
       curves: []
       events:
-      - time: 0.8259386
+      - time: 0.67029655
         functionName: ResetAttackMove
         data: 
         objectReferenceParameter: {instanceID: 0}
