@@ -26,6 +26,8 @@ public class FSMManager : MonoBehaviour
 
     [SerializeField]
     private InputControlsManager _inputControlsManager;
+    [SerializeField]
+    private CharactreMovementController _characterController;
 
     private PlayerMoveStateBase _currentMoveState;
     private PlayerActionStateBase _currentActionState;
@@ -36,10 +38,7 @@ public class FSMManager : MonoBehaviour
 
     private PlayerActionState_Crouch _actionCrouch = null;
     private PlayerActionState_Jump _actionJump = null;
-    //private PlayerMoveState_Crouch _stateCrouch = null;
-    //private PlayerMoveState_Jump _stateJump = null;
         
-    private bool _isWalking = false;
     private bool _isMoving = false;
     private bool _isCrouching = false;
     private bool _isRunning = false;
@@ -59,8 +58,6 @@ public class FSMManager : MonoBehaviour
 
         _actionJump = new PlayerActionState_Jump(this);
         _actionCrouch = new PlayerActionState_Crouch(this);
-        //_stateCrouch = new PlayerMoveState_Crouch(this);
-        //_stateJump = new PlayerMoveState_Jump(this);
 
         SetState(MovementStatus.Idle);
         SetAction(ActionStatus.None);
@@ -68,17 +65,21 @@ public class FSMManager : MonoBehaviour
 
     private void OnIdle(object sender, System.EventArgs e)
     {
+        _isMoving = false;
         SetState(MovementStatus.Idle);
     }
     private void OnMovement(object sender, Vector2 movementVector)
     {
         _isMoving = true;
-        SetState(MovementStatus.Walk);
+        if (_isRunning)
+            SetState(MovementStatus.Run);
+        else
+            SetState(MovementStatus.Walk);
     }
 
     private void OnCrouch(object sender, bool _isCrouched)
     {
-        //_isCrouching = _isCrouched;
+        _isCrouching = _isCrouched;
 
         if (_isCrouched)
             SetAction(ActionStatus.Crouch);
@@ -162,25 +163,13 @@ public class FSMManager : MonoBehaviour
         {
             case MovementStatus.Idle:
                 _currentMoveState = _stateIdle;
-                _isMoving = false;
-                _isRunning = false;
-                _isCrouching = false;
-                _isJumping = false;
                 break;
 
             case MovementStatus.Walk:
-                _isMoving = true;
-                _isRunning = false;
-                _isCrouching = false;
-                _isJumping = false;
                 _currentMoveState = _stateWalk;
                 break;
             
             case MovementStatus.Run:
-                _isMoving = true;
-                _isRunning = true;
-                _isCrouching = false;
-                _isJumping = false;
                 _currentMoveState = _stateRun;
                 break;
 
